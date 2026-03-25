@@ -1,4 +1,6 @@
 __pycache__/
 example-sloutons/
 menv/
+venv/
+requirements.txt
 AppGallery.xlsx
