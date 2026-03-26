@@ -4,7 +4,8 @@ from embeddings import *
 from modelling.modelling import *
 from modelling.data_model import *
 import random
-seed =0
+import numpy as np
+seed = 0
 random.seed(seed)
 np.random.seed(seed)
 
@@ -34,17 +35,21 @@ def perform_modelling(data: Data, df: pd.DataFrame, name):
     model_predict(data, df, name)
 # Code will start executing from following line
 if __name__ == '__main__':
-    
+
     # pre-processing steps
     df = load_data()
     df = preprocess_data(df)
     df[Config.INTERACTION_CONTENT] = df[Config.INTERACTION_CONTENT].values.astype('U')
     df[Config.TICKET_SUMMARY] = df[Config.TICKET_SUMMARY].values.astype('U')
-    
+
     # data transformation
     X, group_df = get_embeddings(df)
+
     # data modelling
     data = get_data_object(X, df)
     # modelling
-    perform_modelling(data, df, 'name')
-
+    perform_modelling(data, df, 'Chained_MultiOutput')
+    
+    print("\n" + "=" * 70)
+    print("EXECUTION COMPLETE")
+    print("=" * 70)
