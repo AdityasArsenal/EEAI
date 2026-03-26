@@ -166,59 +166,54 @@ def noise_remover(df: pd.DataFrame):
     return df
 
 def translate_to_en(texts:list[str]):
-    import stanza
-    from stanza.pipeline.core import DownloadMethod
-    from transformers import pipeline
-    from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer
+    try:
+        import stanza
+        from stanza.pipeline.core import DownloadMethod
+        from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer
 
-    t2t_m = "facebook/m2m100_418M"
-    t2t_pipe = pipeline(task='text2text-generation', model=t2t_m)
+        t2t_m = "facebook/m2m100_418M"
 
-    model = M2M100ForConditionalGeneration.from_pretrained(t2t_m)
-    tokenizer = M2M100Tokenizer.from_pretrained(t2t_m)
+        model = M2M100ForConditionalGeneration.from_pretrained(t2t_m, tie_word_embeddings=False, use_auth_token=False)
+        tokenizer = M2M100Tokenizer.from_pretrained(t2t_m, use_auth_token=False)
 
-    nlp_stanza = stanza.Pipeline(lang="multilingual", processors="langid",
-                                 download_method=DownloadMethod.REUSE_RESOURCES)
-    text_en_l = []
-    for text in texts:
-        if text == "":
-            text_en_l = text_en_l + [text]
-            continue
+        nlp_stanza = stanza.Pipeline(
+          lang="multilingual", processors="langid",
+          download_method=DownloadMethod.REUSE_RESOURCES
+        )
+        text_en_l = []
+        for text in texts:
+            if text == "":
+                text_en_l = text_en_l + [text]
+                continue
 
-        doc = nlp_stanza(text)
-        #print(doc.lang)
-        if doc.lang == "en":
-            text_en_l = text_en_l + [text]
-            # print(text)
-        else:
-            # convert to model supported language code
-            # https://stanfordnlp.github.io/stanza/available_models.html
-            # https://github.com/huggingface/transformers/blob/main/src/transformers/models/m2m_100/tokenization_m2m_100.py
-            lang = doc.lang
-            if lang == "fro":  # fro = Old French
-                lang = "fr"
-            elif lang == "la":  # latin
-                lang = "it"
-            elif lang == "nn":  # Norwegian (Nynorsk)
-                lang = "no"
-            elif lang == "kmr":  # Kurmanji
-                lang = "tr"
-
-            case = 2
-
-            if case == 1:
-                text_en = t2t_pipe(text, forced_bos_token_id=t2t_pipe.tokenizer.get_lang_id(lang='en'))
-                text_en = text_en[0]['generated_text']
-            elif case == 2:
-                tokenizer.src_lang = lang
-                encoded_hi = tokenizer(text, return_tensors="pt")
-                generated_tokens = model.generate(**encoded_hi, forced_bos_token_id=tokenizer.get_lang_id("en"))
-                text_en = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-                text_en = text_en[0]
+            doc = nlp_stanza(text)
+            if doc.lang == "en":
+                text_en_l = text_en_l + [text]
             else:
-                text_en = text
-            text_en_l = text_en_l + [text_en]
-            #print(text)
-            #print(text_en)
-    return text_en_l
+                # convert to model supported language code
+                lang = doc.lang
+                if lang == "fro":  # fro = Old French
+                    lang = "fr"
+                elif lang == "la":  # latin
+                    lang = "it"
+                elif lang == "nn":  # Norwegian (Nynorsk)
+                    lang = "no"
+                elif lang == "kmr":  # Kurmanji
+                    lang = "tr"
+
+                try:
+                    tokenizer.src_lang = lang
+                    encoded_hi = tokenizer(text, return_tensors="pt")
+                    generated_tokens = model.generate(**encoded_hi, forced_bos_token_id=tokenizer.get_lang_id("en"))
+                    text_en = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
+                    text_en_l = text_en_l + [text_en]
+                except Exception as e:
+                    # If translation fails for individual text, keep original
+                    print(f"Translation failed for text: {str(e)[:50]}... Keeping original.")
+                    text_en_l = text_en_l + [text]
+        return text_en_l
+        
+    except (ImportError, Exception) as e:
+        print("Translation skipped")
+        return texts
 
